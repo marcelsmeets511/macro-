@@ -1,0 +1,778 @@
+Sub facturenaanmaken()
+'Ontwikkelt en bedacht door MJJ Smeets (marcelsmeets@programmer.net)
+Dim namerange As Range, cell As Range
+Dim overzichtrecord(40000, 13) As String
+Dim factuurnrlist(40000, 8) As String
+Dim pagesize As Integer, rij As Integer, beginrij As Integer, eindrij As Integer, reccounter As Integer
+Dim aantaluren As Double
+Dim huidigtariefbedrag As Double
+Dim som1 As Double, som2 As Double, som3 As Double, som4 As Double
+Dim headerbreedte As Integer, pagesizepx As Integer, pagecounter As Integer
+'stel de grootte van de pagina hier in (in rijen):
+pagesize = 51
+'stel hier de grootte van de pagina in (in pixels):
+pagesizepx = 750
+'stel de breedte van de gekleurde header bovenaan de pagina hier in (in pixels):
+headerbreedte = 471
+'stel de pagina teller in:
+pagecounter = 1
+'stel hier de kleur van de grijze vakken in
+panelkleur = RGB(235, 235, 235)
+'stel hier de kleur in van de titel van de factuur
+titelkleur = RGB(100, 100, 100)
+som1 = 0
+som2 = 0
+som3 = 0
+som4 = 0
+reccounter = 0
+faccounter = 0
+paginc = 1
+rij = 5
+ActiveWorkbook.Worksheets(2).Activate
+tarieflist = getTarieven
+ActiveWorkbook.Worksheets(1).Activate
+Set namerange = Range("B5:B999")
+namen = createNameList(namerange)
+Set namerange = Range("J5:J999")
+unamelist = createNameList(namerange)
+'Call QuickSortSimple(unamelist, 0, UBound(unamelist))
+adreslist = getNawData(namen)
+ActiveWorkbook.Worksheets(1).Activate
+For Each uname In unamelist
+    If Trim(uname) <> "" Then
+        rij = 5
+        beginrij = reccounter + 6
+        While rij < 1000
+            If IsEmpty(Cells(rij, 10).Value) = True Then
+                rij = 1000
+            Else
+                If Trim(uname) = Trim(Cells(rij, 10).Value) Then
+                    For col = 1 To 12
+                        If col = 1 Then
+                            overzichtrecord(reccounter, col - 1) = CDate(Cells(rij, col).Value)
+                        End If
+                        If IsNumeric(Cells(rij, col).Value) Then
+                            If (Cells(rij, col).Value - Val(Cells(rij, col).Value)) > 0 Then
+                                overzichtrecord(reccounter, col - 1) = Trim(Str(Round(Cells(rij, col).Value, 2)))
+                            Else
+                                overzichtrecord(reccounter, col - 1) = Trim(Str(Cells(rij, col).Value))
+                            End If
+                        Else
+                            overzichtrecord(reccounter, col - 1) = Trim(Cells(rij, col).Text)
+                        End If
+                    Next col
+                    som1 = som1 + Val(Trim(overzichtrecord(reccounter, 6)))
+                    som2 = som2 + Val(Trim(overzichtrecord(reccounter, 7)))
+                    som3 = som3 + Val(Trim(overzichtrecord(reccounter, 8)))
+                    som4 = som4 + Val(Trim(overzichtrecord(reccounter, 3)))
+                    reccounter = reccounter + 1
+                End If
+            End If
+            rij = rij + 1
+        Wend
+    Else
+        Exit For
+    End If
+    eindrij = reccounter + 6
+    reccounter = reccounter + 1
+    overzichtrecord(reccounter, 1) = "totaal"
+    overzichtrecord(reccounter, 6) = som1
+    overzichtrecord(reccounter, 7) = som2
+    overzichtrecord(reccounter, 8) = som3
+    overzichtrecord(reccounter, 12) = som4
+    som1 = 0
+    som2 = 0
+    som3 = 0
+    som4 = 0
+    reccounter = reccounter + 1
+Next uname
+huidigenaam = ""
+huidigefacnr = ""
+huidigtarief = ""
+pagina = 0
+reccounter = reccounter + 1
+ActiveWorkbook.Sheets.Add After:=Worksheets(Worksheets.Count)
+Columns("A").ColumnWidth = 8.58
+Columns("B").ColumnWidth = 7.58
+Columns("C:J").ColumnWidth = 8.08
+'QuickSort overzichtrecord, , , 2
+For rec = 0 To reccounter
+    If overzichtrecord(rec, 1) <> "totaal" And overzichtrecord(rec, 1) <> "" Then
+        If (Trim(huidigtarief) = "persoonlijke begeleiding" And huidigenaam <> overzichtrecord(rec, 1)) Or Trim(huidigefacnr) <> Trim(overzichtrecord(rec, 9)) Then
+            huidigefacnr = Trim(overzichtrecord(rec, 9))
+            huidigadres = getAdres(overzichtrecord(rec, 1), adreslist)
+            huidigtarief = getTariefNaam(overzichtrecord(rec, 5), tarieflist)
+            Cells(pagina + 1, 1).Select
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\header.jpg", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("A" + Trim(Str(pagina + 1))).Left + 1, Top:=Range("A" + Trim(Str(pagina + 2))).Top, Width:=headerbreedte, Height:=5
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\logo.png", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("E" + Trim(Str(pagina + 3))).Left + 10, Top:=Range("E" + Trim(Str(pagina + 3))).Top - 8, Width:=30, Height:=25
+            Cells(pagina + 4, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 5, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 6, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 7, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 4, 5).Value = "Hein Kuipers"
+            Cells(pagina + 4, 5).Font.Size = 14
+            Cells(pagina + 4, 5).Font.Color = titelkleur
+            Cells(pagina + 5, 5).Value = "therapie – training – coaching"
+            Cells(pagina + 5, 5).Font.Color = titelkleur
+            Cells(pagina + 5, 5).Font.Size = 12
+            Cells(pagina + 5, 5).Font.name = "Arial"
+            Cells(pagina + 5, 5).Font.Bold = True
+            Cells(pagina + 5, 5).Font.Italic = True
+            Cells(pagina + 6, 5).Value = "Erkend therapeut NVAGT, EAGT, NVPA en RBNG"
+            Cells(pagina + 7, 5).Value = "AGB-code: 90116166 - AGB-code praktijk: 90092619 - KvK: 14129146"
+            Cells(pagina + 6, 5).Font.Color = titelkleur
+            Cells(pagina + 6, 5).Font.Size = 8
+            Cells(pagina + 6, 5).Font.name = "Arial"
+            Cells(pagina + 6, 5).Font.Italic = True
+            Cells(pagina + 7, 5).Font.Color = titelkleur
+            Cells(pagina + 7, 5).Font.Size = 8
+            Cells(pagina + 7, 5).Font.name = "Arial"
+            Cells(pagina + 7, 5).Font.Italic = True
+            Range("A" + Trim(Str(pagina + 2)) + ":I" + Trim(Str(pagina + 7)) + "").Interior.Color = panelkleur
+            Cells(pagina + 8, 1).Value = "Retouradres:  Sint Annalaan 21 – 6214 AA  Maastricht"
+            Cells(pagina + 8, 1).Font.Size = 8
+            Cells(pagina + 8, 1).Font.name = "Calibri"
+            Cells(pagina + 8, 1).Font.Bold = True
+            Cells(pagina + 8, 1).Font.Color = titelkleur
+            Cells(pagina + 10, 1).Value = huidigadres(11) + overzichtrecord(rec, 1)
+            Cells(pagina + 11, 1).Value = huidigadres(1)
+            Cells(pagina + 12, 1).Value = huidigadres(2) + " " + huidigadres(3)
+            Cells(pagina + 13, 1).Value = huidigadres(4)
+            Range("A" + Trim(Str(pagina + 10)) + ":I" + Trim(Str(pagina + 13))).Font.name = "Calibri"
+            Range("A" + Trim(Str(pagina + 10)) + ":I" + Trim(Str(pagina + 13))).Font.Size = 11
+            Range("A" + Trim(Str(pagina + 10)) + ":I" + Trim(Str(pagina + 13))).Font.Color = titelkleur
+            adrow = 10
+            If Len(Trim(huidigadres(6))) > 0 Then
+                Cells(pagina + adrow, 7).Value = "geboortedatum: " + Trim(Str(Day(CDate(huidigadres(6))))) + "-" + Trim(Str(Month(CDate(huidigadres(6))))) + "-" + Trim(Str(Year(CDate(huidigadres(6)))))
+                adrow = adrow + 1
+            End If
+            If Len(Trim(huidigadres(7))) > 0 Then
+                Cells(pagina + adrow, 7).Value = huidigadres(7)
+                adrow = adrow + 1
+            End If
+            If Len(Trim(huidigadres(8))) > 0 Then
+                Cells(pagina + adrow, 7).Value = "verzekeraar:   " + huidigadres(8)
+                adrow = adrow + 1
+            End If
+            If Len(Trim(huidigadres(9))) > 0 Then
+                Cells(pagina + adrow, 7).Value = "polisnummer:   " + huidigadres(9)
+                adrow = adrow + 1
+            End If
+            If Trim(huidigtarief) = "persoonlijke begeleiding" Then
+                Cells(pagina + 15, 1).Font.name = "Calibri"
+                Cells(pagina + 15, 1).Font.Size = 11
+                Cells(pagina + 15, 1).Font.Bold = True
+                Cells(pagina + 15, 1).Value = "PGB- Zorgverlener: Hein Kuipers, BSN 140360025, KvK 14129146"
+            End If
+            Cells(pagina + 16, 7).Value = "Maastricht, " + Trim(Str(Day(Date))) + "-" + Trim(Str(Month(Date))) + "-" + Trim(Str(Year(Date)))
+            Cells(pagina + 16, 7).Font.name = "Calibri"
+            Cells(pagina + 16, 7).Font.Size = 11
+            Range("A" + Trim(Str(pagina + 16)) + ":I" + Trim(Str(pagina + 16)) + "").Interior.Color = panelkleur
+            Cells(pagina + 18, 1).Value = "Factuurnr:"
+            Cells(pagina + 19, 1).Value = "Debiteurnr:"
+            Cells(pagina + 18, 1).Font.name = "Calibri"
+            Cells(pagina + 18, 1).Font.Size = 10
+            Cells(pagina + 19, 1).Font.name = "Calibri"
+            Cells(pagina + 19, 1).Font.Size = 10
+            Cells(pagina + 18, 2).Value = overzichtrecord(rec, 9)
+            Cells(pagina + 19, 2).Value = overzichtrecord(rec, 11)
+            Cells(pagina + 18, 2).Font.name = "Calibri"
+            Cells(pagina + 18, 2).Font.Size = 10
+            Cells(pagina + 18, 2).Font.Bold = True
+            Cells(pagina + 19, 2).Font.name = "Calibri"
+            Cells(pagina + 19, 2).Font.Size = 10
+            Cells(pagina + 19, 2).Font.Bold = True
+            factuurnrlist(faccounter, 0) = overzichtrecord(rec, 1)
+            factuurnrlist(faccounter, 1) = overzichtrecord(rec, 9)
+            factuurnrlist(faccounter, 2) = huidigadres(13)
+            factuurnrlist(faccounter, 6) = overzichtrecord(rec, 6)
+            factuurnrlist(faccounter, 7) = overzichtrecord(rec, 7)
+            factuurnrlist(faccounter, 8) = overzichtrecord(rec, 8)
+            faccounter = faccounter + 1
+            Range("A" + Trim(Str(pagina + 21)) + ":I" + Trim(Str(pagina + 21)) + "").Interior.Color = panelkleur
+            Cells(pagina + 21, 5).Value = "Complementaire zorg:"
+            Cells(pagina + 21, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 21, 1).Font.name = "Calibri"
+            Cells(pagina + 21, 1).Font.Size = 12
+            Cells(pagina + 21, 1).Font.Bold = True
+            Cells(pagina + 21, 1).Font.Underline = True
+            Cells(pagina + 21, 1).Font.Color = RGB(100, 100, 100)
+            huidigenaam = overzichtrecord(rec, 1)
+            Cells(pagina + 23, 1).Value = "datum:"
+            Cells(pagina + 23, 4).Value = "omschrijving:"
+            Cells(pagina + 23, 8).Value = "bedrag:"
+            If Trim(huidigtarief) = "persoonlijke begeleiding" Then
+                Cells(pagina + 23, 3).Value = "uren:"
+                Cells(pagina + 23, 7).Value = "tarief:"
+            End If
+            Range("A" + Trim(Str(pagina + 23)) + ":I" + Trim(Str(pagina + 23))).Font.name = "Calibri"
+            Range("A" + Trim(Str(pagina + 23)) + ":I" + Trim(Str(pagina + 23))).Font.Size = 11
+            Range("A" + Trim(Str(pagina + 23)) + ":I" + Trim(Str(pagina + 23))).Font.Bold = True
+            Range("A" + Trim(Str(pagina + 23)) + ":I" + Trim(Str(pagina + 23))).Font.Color = RGB(100, 100, 100)
+            Cells(pagina + 41, 5).Value = "Gelieve bovenstaand bedrag vóór " + Trim(Str(Day(Date + 14))) + "-" + Trim(Str(Month(Date + 14))) + "-" + Trim(Str(Year(Date + 14))) + " over te maken naar"
+            Cells(pagina + 42, 5).Value = "rekeningnummer NL36TRIO 078.14.69.511  (H.J. Kuipers, Maastricht) -o.v.v. factuurnummer-"
+            Cells(pagina + 41, 5).Font.name = "Calibri"
+            Cells(pagina + 41, 5).Font.Size = 10
+            Cells(pagina + 42, 5).Font.name = "Calibri"
+            Cells(pagina + 42, 5).Font.Size = 10
+            Cells(pagina + 41, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 42, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 48, 5).Value = "www.lijfenleven.nu  •  Hein Kuipers  •  Sint Annalaan 21, 6214AA Maastricht  •  +31 06 24667302"
+            Cells(pagina + 49, 5).Value = "info@lijfenleven.nu  •  IBAN NL36TRIO 0781469511 -  BIC TRIONL2U•   BTW NL 001674862B18"
+            Cells(pagina + 50, 5).Value = "KvK 14129146"
+            Cells(pagina + 48, 5).Font.Size = 10
+            Cells(pagina + 49, 5).Font.Size = 10
+            Cells(pagina + 50, 5).Font.Size = 10
+            Cells(pagina + 48, 5).Font.name = "Calibri"
+            Cells(pagina + 49, 5).Font.name = "Calibri"
+            Cells(pagina + 50, 5).Font.name = "Calibri"
+            Cells(pagina + 48, 5).Font.Color = titelkleur
+            Cells(pagina + 49, 5).Font.Color = titelkleur
+            Cells(pagina + 50, 5).Font.Color = titelkleur
+            Cells(pagina + 48, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 49, 5).HorizontalAlignment = xlCenter
+            Cells(pagina + 50, 5).HorizontalAlignment = xlCenter
+            Range("A" + Trim(Str(pagina + 44)) + ":I" + Trim(Str(pagina + 50)) + "").Interior.Color = panelkleur
+            Range("B" + Trim(Str(pagina + 47))).Value = "Lidnr:  100644"
+            Range("D" + Trim(Str(pagina + 47))).Value = "Licentie-nr.: 204272R"
+            Range("G" + Trim(Str(pagina + 47))).Value = "Lid NVAGT"
+            Range("A" + Trim(Str(pagina + 47)) + ":H" + Trim(Str(pagina + 47))).Font.Size = 8
+            Range("A" + Trim(Str(pagina + 47)) + ":H" + Trim(Str(pagina + 47))).Font.name = "Calibri"
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\npa.png", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("B" + Trim(Str(pagina + 45))).Left, Top:=Range("B" + Trim(Str(pagina + 45))).Top - 10, Width:=30, Height:=30
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\rbcz.png", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("D" + Trim(Str(pagina + 45))).Left, Top:=Range("D" + Trim(Str(pagina + 45))).Top - 10, Width:=60, Height:=30
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\rec.png", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("G" + Trim(Str(pagina + 45))).Left, Top:=Range("F" + Trim(Str(pagina + 45))).Top - 10, Width:=30, Height:=30
+            ThisWorkbook.ActiveSheet.Shapes.AddPicture Filename:=ThisWorkbook.Path + "\images\eagt.png", linktofile:=msoFalse, savewithdocument:=msoCTrue, Left:=Range("H" + Trim(Str(pagina + 45))).Left, Top:=Range("H" + Trim(Str(pagina + 45))).Top - 10, Width:=30, Height:=30
+            huidigeregel = pagina + 25
+        End If
+        If overzichtrecord(rec, 1) <> "totaal" Then
+            huidigtarief = getTariefNaam(overzichtrecord(rec, 5), tarieflist)
+            huidigtariefid = overzichtrecord(rec, 5)
+            huidigtariefbedrag = getTariefBedrag("PGB1", tarieflist)
+            Cells(huidigeregel, 1).Value = DateSerial(Val(Right(overzichtrecord(rec, 0), 4)), Val(Right(Left(overzichtrecord(rec, 0), 5), 2)), Val(Left(overzichtrecord(rec, 0), 2)))
+            Cells(huidigeregel, 4).Value = huidigtarief
+            Cells(huidigeregel, 8).Value = Val(overzichtrecord(rec, 6))
+            If huidigtarief = "persoonlijke begeleiding" Then
+                If huidigtariefid = "PGB1" Then
+                    aantaluren = 1
+                ElseIf huidigtariefid = "PGB2" Then
+                    aantaluren = 2
+                Else
+                    aantaluren = 3
+                End If
+                Cells(huidigeregel, 3).Font.name = "Calibri"
+                Cells(huidigeregel, 3).Font.Size = 11
+                Cells(huidigeregel, 3).Font.Color = RGB(100, 100, 100)
+                Cells(huidigeregel, 3).HorizontalAlignment = xlLeft
+                Cells(huidigeregel, 3).Value = Trim(Str(aantaluren))
+                Cells(huidigeregel, 7).Font.name = "Calibri"
+                Cells(huidigeregel, 7).Font.Size = 11
+                Cells(huidigeregel, 7).Font.Color = RGB(100, 100, 100)
+                Cells(huidigeregel, 7).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+                Cells(huidigeregel, 7).Value = huidigtariefbedrag
+            End If
+            'Cells(huidigeregel, 1).NumberFormat = "dd-mm-yyyy"
+            Cells(huidigeregel, 4).NumberFormat = "@"
+            Cells(huidigeregel, 8).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+            Cells(huidigeregel, 1).Font.name = "Calibri"
+            Cells(huidigeregel, 1).Font.Size = 11
+            Cells(huidigeregel, 1).Font.Color = RGB(100, 100, 100)
+            Cells(huidigeregel, 4).Font.name = "Calibri"
+            Cells(huidigeregel, 4).Font.Size = 11
+            Cells(huidigeregel, 4).Font.Color = RGB(100, 100, 100)
+            Cells(huidigeregel, 8).Font.name = "Calibri"
+            Cells(huidigeregel, 8).Font.Size = 11
+            Cells(huidigeregel, 8).Font.Color = RGB(100, 100, 100)
+            huidigeregel = huidigeregel + 1
+        End If
+    ElseIf overzichtrecord(rec, 1) = "totaal" Then
+        huidigeregel = huidigeregel + 1
+        Cells(huidigeregel, 4) = "Prestatiecode 24503"
+        Cells(huidigeregel, 4).Font.name = "Calibri"
+        Cells(huidigeregel, 4).Font.Size = 11
+        Cells(huidigeregel, 4).Font.Color = titelkleur
+        huidigeregel = huidigeregel + 1
+        Cells(huidigeregel, 4) = "BTW 21% (indien van toepassing):"
+        Cells(huidigeregel, 4).Font.name = "Calibri"
+        Cells(huidigeregel, 4).Font.Size = 11
+        Cells(huidigeregel, 4).Font.Color = titelkleur
+        Cells(huidigeregel, 8).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+        Cells(huidigeregel, 8).Value = overzichtrecord(rec, 7)
+        Cells(huidigeregel, 8).Font.name = "Calibri"
+        Cells(huidigeregel, 8).Font.Size = 11
+        Cells(huidigeregel, 8).Font.Color = titelkleur
+        huidigeregel = huidigeregel + 2
+        Cells(huidigeregel, 4) = "Totaal:"
+        Cells(huidigeregel, 4).Font.name = "Calibri"
+        Cells(huidigeregel, 4).Font.Size = 11
+        Cells(huidigeregel, 4).Font.Bold = True
+        Cells(huidigeregel, 4).Font.Color = titelkleur
+        Cells(huidigeregel, 8).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+        Cells(huidigeregel, 8).Value = Val(Replace(overzichtrecord(rec, 8), ",", "."))
+        Cells(huidigeregel, 8).Font.name = "Calibri"
+        Cells(huidigeregel, 8).Font.Size = 11
+        Cells(huidigeregel, 8).Font.Color = titelkleur
+        Cells(huidigeregel, 8).Font.Bold = True
+        Cells(huidigeregel, 8).Font.Italic = True
+        Cells(huidigeregel, 8).Borders(xlEdgeTop).Color = RGB(100, 100, 100)
+        Cells(huidigeregel, 8).Borders(xlEdgeTop).Weight = 2
+        If overzichtrecord(rec, 12) > 0 Then
+            huidigeregel = huidigeregel + 1
+            Cells(huidigeregel, 4) = "Reeds contant betaald:"
+            Cells(huidigeregel, 4).Font.name = "Calibri"
+            Cells(huidigeregel, 4).Font.Size = 11
+            Cells(huidigeregel, 4).Font.Color = titelkleur
+            Cells(huidigeregel, 4).Font.Bold = True
+            Cells(huidigeregel, 8).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+            Cells(huidigeregel, 8).Value = overzichtrecord(rec, 12)
+            Cells(huidigeregel, 8).Font.name = "Calibri"
+            Cells(huidigeregel, 8).Font.Size = 11
+            Cells(huidigeregel, 8).Font.Color = titelkleur
+            Cells(huidigeregel, 8).Font.Bold = True
+            Cells(huidigeregel, 8).Font.Italic = True
+            huidigeregel = huidigeregel + 1
+            Cells(huidigeregel, 4) = "Nog te voldoen:"
+            Cells(huidigeregel, 4).Font.name = "Calibri"
+            Cells(huidigeregel, 4).Font.Size = 11
+            Cells(huidigeregel, 4).Font.Color = titelkleur
+            Cells(huidigeregel, 4).Font.Bold = True
+            Cells(huidigeregel, 8).NumberFormat = "_ [$€-413] * #,##0.00_ ;_ [$€-413] * -#,##0.00_ ;_ [$€-413] * " + Chr(34) + "-" + Chr(34) + "??_ ;_ @_ "
+            Cells(huidigeregel, 8).Value = overzichtrecord(rec, 8) - overzichtrecord(rec, 12)
+            Cells(huidigeregel, 8).Font.name = "Calibri"
+            Cells(huidigeregel, 8).Font.Size = 11
+            Cells(huidigeregel, 8).Font.Color = titelkleur
+            Cells(huidigeregel, 8).Font.Bold = True
+            Cells(huidigeregel, 8).Font.Italic = True
+        End If
+        pagina = pagina + pagesize
+    End If
+Next rec
+registerlastinvoices (factuurnrlist)
+ActiveWorkbook.Worksheets(4).Activate
+answer = MsgBox("Wilt u nu van iedere factuur een PDF bestand genereren?", vbYesNo, "PDF genereren?")
+If answer = vbYes Then
+    pdflist = GeneratePDF(pagesize, faccounter, factuurnrlist)
+    answer = MsgBox("Wilt u deze PDF bestanden mailen naar de clienten?", vbYesNo, "PDF facturen mailen?")
+    If answer = vbYes Then
+        mailcounter = Val(pdflist(0, 4))
+        x = mailpdf(pdflist, mailcounter)
+    End If
+End If
+ActiveWorkbook.Worksheets(1).Activate
+End Sub
+Function DirectoryExists(Directory As String) As Boolean
+    DirectoryExists = False
+    If Not Dir(Directory, vbDirectory) = "" Then
+        If GetAttr(Directory) = vbDirectory Then
+            DirectoryExists = True
+        End If
+    End If
+End Function
+Function GeneratePDF(pagesize, faccounter, factuurlist)
+Dim dirnaarjaar As String
+Dim dirnaarmaand As String
+Dim pdflist(30000, 8) As String
+pagepx = 0
+counter = 0
+lcounter = 0
+While counter < faccounter
+    beginrij = (counter * pagesize) + 1
+    eindrij = (counter + 1) * pagesize - 2
+    Range("A" + Trim(Str(beginrij)) + ":I" + Trim(Str(eindrij))).Select
+    ActiveWorkbook.Worksheets(4).Select
+    jaar = Left(factuurlist(counter, 1), 4)
+    maand = Val(Right(Left(factuurlist(counter, 1), 7), 2))
+    dirnaarjaar = ThisWorkbook.Path & "\facturen\" & jaar & "\"
+    If Not FileFolderExists(dirnaarjaar) Then
+        MkDir (dirnaarjaar)
+    End If
+    If maand < 9 Then
+        maandnr = "0" & Trim(Str(maand))
+    Else
+        maandnr = Trim(Str(maand))
+    End If
+    dirnaarmaand = dirnaarjaar & maandnr & " " & Trim(getmaand(maand))
+    If maand = 3 Or maand = 6 Or maand = 9 Or maand = 12 Then
+        kwartaalnr = maand / 3
+        dirnaarmaand = dirnaarmaand & " KW " + Trim(Str(kwartaalnr))
+    End If
+    If Not FileFolderExists(dirnaarmaand) Then
+        MkDir (dirnaarmaand)
+    End If
+    padnaarpdf = dirnaarmaand + "\factuur-" + Trim(factuurlist(counter, 1)) + "-" + Replace(Trim(factuurlist(counter, 0)), " ", "_") + ".pdf"
+    Selection.ExportAsFixedFormat Type:=xlTypePDF, Filename:= _
+      padnaarpdf, Quality:=xlQualityStandard, _
+      IncludeDocProperties:=True, IgnorePrintAreas:=False, OpenAfterPublish:= _
+      True
+    If Len(Trim(factuurlist(counter, 2))) > 0 Then
+        pdflist(lcounter, 0) = factuurlist(counter, 1)
+        pdflist(lcounter, 1) = factuurlist(counter, 2)
+        pdflist(lcounter, 2) = padnaarpdf
+        pdflist(lcounter, 3) = factuurlist(counter, 0)
+        pdflist(lcounter, 6) = factuurlist(counter, 6)
+        pdflist(lcounter, 7) = factuurlist(counter, 7)
+        pdflist(lcounter, 8) = factuurlist(counter, 8)
+        lcounter = lcounter + 1
+    End If
+    counter = counter + 1
+Wend
+pdflist(0, 4) = Trim(Str(lcounter))
+GeneratePDF = pdflist
+End Function
+Public Function FileFolderExists(strFullPath As String) As Boolean
+
+    If strFullPath = vbNullString Then Exit Function
+    On Error GoTo EarlyExit
+    If Not Dir(strFullPath, vbDirectory) = vbNullString Then FileFolderExists = True
+    
+EarlyExit:
+    On Error GoTo 0
+End Function
+Function mailpdf(pdflist, mailcount)
+Dim CDO_Mail_Object As Object
+Dim CDO_Config As Object
+Dim SMTP_Config As Variant
+Dim Email_Subject, Email_Send_From, Email_Send_To, Email_Cc, Email_Bcc, Email_Body, AdminMailAddress As String
+pdfcounter = 0
+AdminMailAddress = "heinkuipers@lijfenleven.nu"
+While pdfcounter < mailcount
+    Email_Subject = "Factuur " + pdflist(pdfcounter, 0)
+    Email_Send_From = AdminMailAddress
+    Email_Send_To = pdflist(pdfcounter, 1)
+    Email_Bcc = AdminMailAddress
+    ' Build HTML for message body.
+    strHTML = "<HTML>"
+    strHTML = strHTML & "<HEAD>"
+    strHTML = strHTML & "<BODY>"
+    strHTML = strHTML & "<i>[In de bijlage (attachment) vind je de factuur (pdf bestand)]</i><br />"
+    strHTML = strHTML & "<p style='font-family:Calibri;'>Beste " & voornaam(pdflist(pdfcounter, 3)) & ",<br /><br />"
+    strHTML = strHTML & "Bijgevoegd de factuur met betrekking tot de consulten van afgelopen maand;<br />"
+    strHTML = strHTML & "zou je het openstaande bedrag voor " & Trim(Str(Day(Date + 14))) & "-" & Trim(Str(Month(Date + 14))) & "-" & Trim(Str(Year(Date + 14)))
+    strHTML = strHTML & " over willen maken op rekeningnummer  <b>NL36TRIO 078.14.69.511 - BIC TRIONL2U</b> (H.J. Kuipers, Maastricht)"
+    strHTML = strHTML & " o.v.v. het factuurnummer.<br /><br />"
+    strHTML = strHTML & "Ik raad je aan de gegevens op de factuur nog even op juistheid na te lopen alvorens deze door te sturen naar je verzekering*. Klopt er volgens jou iets niet, of heb je vragen - neem dan even contact met mij op.<br /><br />"
+    strHTML = strHTML & "<small>*indien van toepassing</small><br /><br />"
+    strHTML = strHTML & "Met vriendelijke groet,<br /><br />"
+    strHTML = strHTML & "Hein Kuipers<br /><br />"
+    strHTML = strHTML & "<h4>Bijgevoegd de factuur t.b.v. je ziektekostenverzekering.</h4>"
+    strHTML = strHTML & "<br /><br />tot ziens!<br /><br />vriendelijke groet,<br /><br /><span>Hein</span>"
+    strHTML = strHTML & "</p>"
+    strHTML = strHTML & "</BODY>"
+    strHTML = strHTML & "</HTML>"
+    Email_Body = strHTML
+    Set CDO_Mail_Object = CreateObject("CDO.Message")
+    On Error GoTo debugs
+    Set CDO_Config = CreateObject("CDO.Configuration")
+    CDO_Config.Load -1
+    Set SMTP_Config = CDO_Config.Fields
+    With SMTP_Config
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = 1
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
+        'please put your server name below
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpserver") = "smtp.gmail.com"
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = 465
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = 1
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendusername") = "hein.kuipers.factuurbeheer@gmail.com"
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendpassword") = "FACTb1jz0nder"
+        .Update
+    End With
+    With CDO_Mail_Object
+        Set .Configuration = CDO_Config
+    End With
+    CDO_Mail_Object.Subject = Email_Subject
+    CDO_Mail_Object.From = Email_Send_From
+    CDO_Mail_Object.To = Email_Send_To
+    CDO_Mail_Object.HTMLBody = Email_Body 'use HTML instead of TextBody
+    CDO_Mail_Object.CC = Email_Cc 'Use if needed
+    CDO_Mail_Object.BCC = Email_Bcc 'Use if needed
+    CDO_Mail_Object.AddAttachment pdflist(pdfcounter, 2) 'Use if needed
+    CDO_Mail_Object.Send
+    pdfcounter = pdfcounter + 1
+Wend
+debugs:
+    If Err.Description <> "" Then MsgBox Err.Description
+End Function
+Function mailpdfoutlook(pdflist, mailcount)
+pdfcounter = 0
+While pdfcounter < mailcount
+    'Create the mail
+    Set OutApp = CreateObject("Outlook.Application")
+    Set OutMail = OutApp.CreateItem(0)
+    strbody = "Beste " & voornaam(pdflist(pdfcounter, 3)) & vbNewLine & vbNewLine & _
+              "Bijgevoegd de factuur met betrekking tot de consulten van afgelopen maand." & vbNewLine & vbNewLine & _
+              "met vriendelijke groet," & vbNewLine & vbNewLine & _
+              "Hein" & vbNewLine
+    On Error Resume Next
+    ontvanger = "hein.j.kuipers@gmail.com" 'pdflist(pdfcounter, 1)
+    With OutMail
+        .To = ontvanger
+        .CC = "marcelsmeets@programmer.net"
+        .BCC = ""
+        .Subject = "Factuur " + pdflist(pdfcounter, 0)
+        .Body = strbody
+        .Attachments.Add pdflist(pdfcounter, 2)
+        .Send   'or use .Display
+    End With
+    On Error GoTo 0
+    pdfcounter = pdfcounter + 1
+Wend
+a = MsgBox("Er zijn in totaal " + Trim(Str(mailcount)) + " facturen in pdf formaat gemaild aan clienten.", vbOKOnly, "Mailen voltooid.")
+mailpdf = True
+End Function
+Function voornaam(naam)
+voornaam = Left(naam, InStr(naam, " "))
+End Function
+Function getmaand(mnd)
+If mnd = 1 Then
+    getmaand = "januari"
+ElseIf mnd = 2 Then
+    getmaand = "februari"
+ElseIf mnd = 3 Then
+    getmaand = "maart"
+ElseIf mnd = 4 Then
+    getmaand = "april"
+ElseIf mnd = 5 Then
+    getmaand = "mei"
+ElseIf mnd = 6 Then
+    getmaand = "juni"
+ElseIf mnd = 7 Then
+    getmaand = "juli"
+ElseIf mnd = 8 Then
+    getmaand = "augustus"
+ElseIf mnd = 9 Then
+    getmaand = "september"
+ElseIf mnd = 10 Then
+    getmaand = "oktober"
+ElseIf mnd = 11 Then
+    getmaand = "november"
+ElseIf mnd = 12 Then
+    getmaand = "december"
+End If
+End Function
+Function getNawDataFromFacnr(facnrs, debnrs)
+Dim facnrlijst(30000, 30) As String
+ActiveWorkbook.Worksheets(3).Activate
+teller = 0
+cx = 0
+For Each facnr In facnrs
+    rij = 7
+    While Cells(rij, 1).Value <> "" And Not IsEmpty(Cells(rij, 1).Value)
+        If cx < 3000 Then
+            If Trim(Cells(rij, 13).Value) = Trim(debnrs(cx)) Then
+                x = 1
+                While x < 31
+                    facnrlijst(teller, x - 1) = Cells(rij, x).Value
+                    x = x + 1
+                Wend
+                teller = teller + 1
+            End If
+        End If
+        rij = rij + 1
+        cx = cx + 1
+    Wend
+Next facnr
+getNawDataFromFacnr = facnrlijst
+End Function
+Function getNawData(namen)
+Dim adreslijst(30000, 30) As String
+ActiveWorkbook.Worksheets(3).Activate
+teller = 0
+For Each naam In namen
+    rij = 7
+    While Cells(rij, 1).Value <> "" And Not IsEmpty(Cells(rij, 1).Value)
+        If Trim(Cells(rij, 1).Value) = Trim(naam) Then
+            x = 1
+            While x < 31
+                adreslijst(teller, x - 1) = Cells(rij, x).Value
+                x = x + 1
+            Wend
+            teller = teller + 1
+        End If
+        rij = rij + 1
+    Wend
+Next naam
+getNawData = adreslijst
+End Function
+Function getAdres(naam, list)
+Dim adres(30) As String
+x = 0
+While list(x, 0) <> ""
+    If Trim(list(x, 0)) = Trim(naam) Then
+        j = 1
+        While j < 31
+            adres(j) = list(x, j)
+            j = j + 1
+        Wend
+    End If
+    x = x + 1
+Wend
+getAdres = adres
+End Function
+Function getTarieven()
+Dim tarieven(9999, 4) As String
+rowcounter = 5
+lstcounter = 0
+While Len(Trim(Cells(rowcounter, 1).Value)) > 0
+    tarieven(lstcounter, 0) = Cells(rowcounter, 1).Value
+    tarieven(lstcounter, 1) = Cells(rowcounter, 2).Value
+    tarieven(lstcounter, 3) = Cells(rowcounter, 3).Value
+    tarieven(lstcounter, 4) = Cells(rowcounter, 4).Value
+    lstcounter = lstcounter + 1
+    rowcounter = rowcounter + 1
+Wend
+getTarieven = tarieven
+End Function
+Function getTariefNaam(tarief, lst)
+counter = 0
+retval = ""
+While counter < 9999
+    If Len(Trim(lst(counter, 0))) > 0 Then
+        If Trim(tarief) = Trim(lst(counter, 0)) Then
+            retval = Trim(lst(counter, 4))
+            counter = 9999
+        End If
+    End If
+    counter = counter + 1
+Wend
+getTariefNaam = retval
+End Function
+Function getTariefBedrag(tarief, lst)
+Dim retval As Double
+counter = 0
+retval = 0
+While counter < 9999
+    If Len(Trim(lst(counter, 0))) > 0 Then
+        If Trim(tarief) = Trim(lst(counter, 0)) Then
+            retval = lst(counter, 1)
+            counter = 9999
+        End If
+    End If
+    counter = counter + 1
+Wend
+getTariefBedrag = retval
+End Function
+Function registerlastinvoices(invoices)
+ActiveWorkbook.Worksheets(3).Activate
+invcounter = 0
+While invcounter < UBound(invoices)
+    rowcounter = 7
+    While Len(Cells(rowcounter, 1).Value) > 0
+        If Trim(Cells(rowcounter, 1).Value) = Trim(invoices(invcounter, 0)) Then
+            Cells(rowcounter, 17).Value = invoices(invcounter, 1)
+        End If
+        rowcounter = rowcounter + 1
+    Wend
+    invcounter = invcounter + 1
+Wend
+End Function
+Public Sub QuickSortArray(ByRef SortArray As Variant, Optional lngMin As Long = -1, Optional lngMax As Long = -1, Optional lngColumn As Long = 0)
+    On Error Resume Next
+    
+    Dim i As Long
+    Dim j As Long
+    Dim varMid As Variant
+    Dim arrRowTemp As Variant
+    Dim lngColTemp As Long
+
+    If IsEmpty(SortArray) Then
+        Exit Sub
+    End If
+    If InStr(TypeName(SortArray), "()") < 1 Then  'IsArray() is somewhat broken: Look for brackets in the type name
+        Exit Sub
+    End If
+    If lngMin = -1 Then
+        lngMin = LBound(SortArray, 1)
+    End If
+    If lngMax = -1 Then
+        lngMax = UBound(SortArray, 1)
+    End If
+    If lngMin >= lngMax Then    ' no sorting required
+        Exit Sub
+    End If
+
+    i = lngMin
+    j = lngMax
+
+    varMid = Empty
+    varMid = SortArray((lngMin + lngMax) \ 2, lngColumn)
+
+    ' We  send 'Empty' and invalid data items to the end of the list:
+    If IsObject(varMid) Then  ' note that we don't check isObject(SortArray(n)) - varMid *might* pick up a valid default member or property
+        i = lngMax
+        j = lngMin
+    ElseIf IsEmpty(varMid) Then
+        i = lngMax
+        j = lngMin
+    ElseIf IsNull(varMid) Then
+        i = lngMax
+        j = lngMin
+    ElseIf varMid = "" Then
+        i = lngMax
+        j = lngMin
+    ElseIf VarType(varMid) = vbError Then
+        i = lngMax
+        j = lngMin
+    ElseIf VarType(varMid) > 17 Then
+        i = lngMax
+        j = lngMin
+    End If
+
+    While i <= j
+        While SortArray(i, lngColumn) < varMid And i < lngMax
+            i = i + 1
+        Wend
+        While varMid < SortArray(j, lngColumn) And j > lngMin
+            j = j - 1
+        Wend
+
+        If i <= j Then
+            ' Swap the rows
+            ReDim arrRowTemp(LBound(SortArray, 2) To UBound(SortArray, 2))
+            For lngColTemp = LBound(SortArray, 2) To UBound(SortArray, 2)
+                arrRowTemp(lngColTemp) = SortArray(i, lngColTemp)
+                SortArray(i, lngColTemp) = SortArray(j, lngColTemp)
+                SortArray(j, lngColTemp) = arrRowTemp(lngColTemp)
+            Next lngColTemp
+            Erase arrRowTemp
+
+            i = i + 1
+            j = j - 1
+        End If
+    Wend
+
+    If (lngMin < j) Then Call QuickSortArray(SortArray, lngMin, j, lngColumn)
+    If (i < lngMax) Then Call QuickSortArray(SortArray, i, lngMax, lngColumn)
+
+End Sub
+
+Public Sub QuickSortSimple(vArray As Variant, inLow As Long, inHi As Long)
+  Dim pivot   As Variant
+  Dim tmpSwap As Variant
+  Dim tmpLow  As Long
+  Dim tmpHi   As Long
+
+  tmpLow = inLow
+  tmpHi = inHi
+
+  pivot = vArray((inLow + inHi) \ 2)
+
+  While (tmpLow <= tmpHi)
+     While (vArray(tmpLow) < pivot And tmpLow < inHi)
+        tmpLow = tmpLow + 1
+     Wend
+
+     While (pivot < vArray(tmpHi) And tmpHi > inLow)
+        tmpHi = tmpHi - 1
+     Wend
+
+     If (tmpLow <= tmpHi) Then
+        tmpSwap = vArray(tmpLow)
+        vArray(tmpLow) = vArray(tmpHi)
+        vArray(tmpHi) = tmpSwap
+        tmpLow = tmpLow + 1
+        tmpHi = tmpHi - 1
+     End If
+  Wend
+
+  If (inLow < tmpHi) Then QuickSortSimple vArray, inLow, tmpHi
+  If (tmpLow < inHi) Then QuickSortSimple vArray, tmpLow, inHi
+End Sub

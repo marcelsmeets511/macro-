@@ -1,0 +1,371 @@
+Sub facturenprinten()
+'Ontwikkelt en bedacht door MJJ Smeets (marcelsmeets@programmer.net)
+Dim namerange As Range, cell As Range
+Dim overzichtrecord(30000, 13) As String
+Dim factuurnrlist(30000, 8) As String
+Dim pagesize As Integer, rij As Integer, beginrij As Integer, eindrij As Integer, reccounter As Integer
+Dim headerbreedte As Integer, pagesizepx As Integer, pagecounter As Integer
+'stel de grootte van de pagina hier in (in rijen):
+pagesize = 51
+'stel hier de grootte van de pagina in (in pixels):
+pagesizepx = 750
+'stel de breedte van de gekleurde header bovenaan de pagina hier in (in pixels):
+headerbreedte = 467
+'stel de pagina teller in:
+pagecounter = 1
+namecounter = 1
+'stel hier de kleur van de grijze vakken in
+panelkleur = RGB(235, 235, 235)
+'stel hier de kleur in van de titel van de factuur
+titelkleur = RGB(100, 100, 100)
+som1 = 0
+som2 = 0
+som3 = 0
+som4 = 0
+reccounter = 0
+faccounter = 0
+paginc = 1
+rij = 5
+ActiveWorkbook.Worksheets(2).Activate
+tarieflist = getTarieven
+ActiveWorkbook.Worksheets(1).Activate
+Set namerange = Range("B5:B999")
+namen = createNameList(namerange)
+Set namerange = Range("J5:J999")
+unamelist = createNameList(namerange)
+'Set namerange = Range("B5:B999")
+'unamelist = createUniqNameList(namerange)
+adreslist = getNawData(namen)
+ActiveWorkbook.Worksheets(1).Activate
+For Each uname In unamelist
+    If Trim(uname) <> "" Then
+        rij = 5
+        beginrij = reccounter + 6
+        While rij < 1000
+            If IsEmpty(Cells(rij, 2).Value) = True Then
+                rij = 1000
+            Else
+                If Trim(uname) = Trim(Cells(rij, 10).Value) Then
+                    For col = 1 To 12
+                        If col = 1 Then
+                            overzichtrecord(reccounter, col - 1) = CDate(Cells(rij, col).Value)
+                        End If
+                        If IsNumeric(Cells(rij, col).Value) Then
+                            If (Cells(rij, col).Value - Val(Cells(rij, col).Value)) > 0 Then
+                                overzichtrecord(reccounter, col - 1) = Trim(Str(Round(Cells(rij, col).Value, 2)))
+                            Else
+                                overzichtrecord(reccounter, col - 1) = Trim(Str(Cells(rij, col).Value))
+                            End If
+                        Else
+                            overzichtrecord(reccounter, col - 1) = Trim(Cells(rij, col).Text)
+                        End If
+                    Next col
+                    som1 = som1 + Val(Trim(overzichtrecord(reccounter, 6)))
+                    som2 = som2 + Val(Trim(overzichtrecord(reccounter, 7)))
+                    som3 = som3 + Val(Trim(overzichtrecord(reccounter, 8)))
+                    som4 = som4 + Val(Trim(overzichtrecord(reccounter, 3)))
+                    reccounter = reccounter + 1
+                End If
+            End If
+            rij = rij + 1
+        Wend
+    Else
+        Exit For
+    End If
+    eindrij = reccounter + 6
+    reccounter = reccounter + 1
+    overzichtrecord(reccounter, 1) = "totaal"
+    overzichtrecord(reccounter, 6) = som1
+    overzichtrecord(reccounter, 7) = som2
+    overzichtrecord(reccounter, 8) = som3
+    overzichtrecord(reccounter, 12) = som4
+    som1 = 0
+    som2 = 0
+    som3 = 0
+    som4 = 0
+    reccounter = reccounter + 1
+Next uname
+huidigenaam = ""
+huidigefacnr = ""
+huidigtarief = ""
+pagina = 0
+reccounter = reccounter + 1
+For rec = 0 To reccounter
+    If overzichtrecord(rec, 1) <> "totaal" And overzichtrecord(rec, 1) <> "" Then
+        If (Trim(huidigtarief) = "persoonlijke begeleiding" And huidigenaam <> overzichtrecord(rec, 1)) Or Trim(huidigefacnr) <> Trim(overzichtrecord(rec, 9)) Then
+            huidigadres = getAdres(overzichtrecord(rec, 1), adreslist)
+            huidigefacnr = Trim(overzichtrecord(rec, 9))
+            huidigtarief = getTariefNaam(overzichtrecord(rec, 5), tarieflist)
+            factuurnrlist(faccounter, 0) = overzichtrecord(rec, 1)
+            factuurnrlist(faccounter, 1) = overzichtrecord(rec, 9)
+            factuurnrlist(faccounter, 2) = huidigadres(13)
+            factuurnrlist(faccounter, 6) = overzichtrecord(rec, 6)
+            factuurnrlist(faccounter, 7) = overzichtrecord(rec, 7)
+            factuurnrlist(faccounter, 8) = overzichtrecord(rec, 8)
+            faccounter = faccounter + 1
+            huidigenaam = overzichtrecord(rec, 1)
+            huidigeregel = pagina + 25
+        End If
+        pagina = pagina + pagesize
+    End If
+Next rec
+ActiveWorkbook.Worksheets(4).Activate
+answer = MsgBox("Wilt u nu van iedere factuur een PDF bestand genereren?", vbYesNo, "PDF genereren?")
+If answer = vbYes Then
+    pdflist = GeneratePDF(pagesize, faccounter, factuurnrlist)
+    answer = MsgBox("Wilt u deze PDF bestanden mailen naar de clienten?", vbYesNo, "PDF facturen mailen?")
+    If answer = vbYes Then
+        mailcounter = Val(pdflist(0, 4))
+        x = mailpdf(pdflist, mailcounter)
+    End If
+End If
+ActiveWorkbook.Worksheets(1).Activate
+End Sub
+Function GeneratePDF(pagesize, faccounter, factuurlist)
+Dim pdflist(30000, 8) As String
+Dim dirnaarjaar As String
+Dim dirnaarmaand As String
+pagepx = 0
+counter = 0
+lcounter = 0
+While counter < faccounter
+    beginrij = (counter * pagesize) + 1
+    eindrij = (counter + 1) * pagesize - 2
+    Range("A" + Trim(Str(beginrij)) + ":I" + Trim(Str(eindrij))).Select
+    ActiveWorkbook.Worksheets(4).Select
+    jaar = Left(factuurlist(counter, 1), 4)
+    maand = Val(Right(Left(factuurlist(counter, 1), 7), 2))
+    dirnaarjaar = ThisWorkbook.Path & "\facturen\" & jaar & "\"
+    If Not FileFolderExists(dirnaarjaar) Then
+        MkDir (dirnaarjaar)
+    End If
+    If maand < 9 Then
+        maandnr = "0" & Trim(Str(maand))
+    Else
+        maandnr = Trim(Str(maand))
+    End If
+    dirnaarmaand = dirnaarjaar & maandnr & " " & Trim(getmaand(maand))
+    If maand = 3 Or maand = 6 Or maand = 9 Or maand = 12 Then
+        kwartaalnr = maand / 3
+        dirnaarmaand = dirnaarmaand & " KW " + Trim(Str(kwartaalnr))
+    End If
+    If Not FileFolderExists(dirnaarmaand) Then
+        MkDir (dirnaarmaand)
+    End If
+    padnaarpdf = dirnaarmaand + "\factuur-" + Trim(factuurlist(counter, 1)) + "-" + Replace(Trim(factuurlist(counter, 0)), " ", "_") + ".pdf"
+    Selection.ExportAsFixedFormat Type:=xlTypePDF, Filename:= _
+      padnaarpdf, Quality:=xlQualityStandard, _
+      IncludeDocProperties:=True, IgnorePrintAreas:=False, OpenAfterPublish:= _
+      True
+    If Len(Trim(factuurlist(counter, 2))) > 0 Then
+        pdflist(lcounter, 0) = factuurlist(counter, 1)
+        pdflist(lcounter, 1) = factuurlist(counter, 2)
+        pdflist(lcounter, 2) = padnaarpdf
+        pdflist(lcounter, 3) = factuurlist(counter, 0)
+        pdflist(lcounter, 4) = factuurlist(counter, 4)
+        pdflist(lcounter, 6) = factuurlist(counter, 6)
+        pdflist(lcounter, 7) = factuurlist(counter, 7)
+        pdflist(lcounter, 8) = factuurlist(counter, 8)
+        lcounter = lcounter + 1
+    End If
+    counter = counter + 1
+Wend
+pdflist(0, 4) = Trim(Str(lcounter))
+GeneratePDF = pdflist
+End Function
+Public Function FileFolderExists(strFullPath As String) As Boolean
+
+    If strFullPath = vbNullString Then Exit Function
+    On Error GoTo EarlyExit
+    If Not Dir(strFullPath, vbDirectory) = vbNullString Then FileFolderExists = True
+    
+EarlyExit:
+    On Error GoTo 0
+End Function
+Function mailpdf(pdflist, mailcount)
+Dim CDO_Mail_Object As Object
+Dim CDO_Config As Object
+Dim SMTP_Config As Variant
+Dim Email_Subject, Email_Send_From, Email_Send_To, Email_Cc, Email_Bcc, Email_Body, AdminMailAddress As String
+pdfcounter = 0
+AdminMailAddress = "heinkuipers@lijfenleven.nu"
+While pdfcounter < mailcount
+    Email_Subject = "Factuur " + pdflist(pdfcounter, 0)
+    Email_Send_From = AdminMailAddress
+    Email_Send_To = pdflist(pdfcounter, 1)
+    Email_Bcc = AdminMailAddress
+    ' Build HTML for message body.
+    strHTML = "<HTML>"
+    strHTML = strHTML & "<HEAD>"
+    strHTML = strHTML & "<BODY>"
+    strHTML = strHTML & "<i>[In de bijlage (attachment) vind je de factuur (pdf bestand)]</i><br />"
+    strHTML = strHTML & "<p style='font-family:Calibri;'>Beste " & voornaam(pdflist(pdfcounter, 3)) & ",<br /><br />"
+    strHTML = strHTML & "Bijgevoegd de factuur met betrekking tot de consulten van afgelopen maand;<br />"
+    strHTML = strHTML & "zou je het openstaande bedrag voor " & Trim(Str(Day(Date + 14))) & "-" & Trim(Str(Month(Date + 14))) & "-" & Trim(Str(Year(Date + 14)))
+    strHTML = strHTML & " over willen maken op rekeningnummer  <b>NL36TRIO 078.14.69.511 - BIC TRIONL2U</b> (H.J. Kuipers, Maastricht)"
+    strHTML = strHTML & " o.v.v. het factuurnummer.<br /><br />"
+    strHTML = strHTML & "Ik raad je aan de gegevens op de factuur nog even op juistheid na te lopen alvorens deze door te sturen naar je verzekering*. Klopt er volgens jou iets niet, of heb je vragen - neem dan even contact met mij op.<br /><br />"
+    strHTML = strHTML & "<small>*indien van toepassing</small><br /><br />"
+    strHTML = strHTML & "Met vriendelijke groet,<br /><br />"
+    strHTML = strHTML & "Hein Kuipers<br /><br />"
+    strHTML = strHTML & "<h4>Bijgevoegd de factuur t.b.v. je ziektekostenverzekering.</h4>"
+    strHTML = strHTML & "<br /><br />tot ziens!<br /><br />vriendelijke groet,<br /><br /><span>Hein</span>"
+    strHTML = strHTML & "</p>"
+    strHTML = strHTML & "</BODY>"
+    strHTML = strHTML & "</HTML>"
+    Email_Body = strHTML
+    Set CDO_Mail_Object = CreateObject("CDO.Message")
+    On Error GoTo debugs
+    Set CDO_Config = CreateObject("CDO.Configuration")
+    CDO_Config.Load -1
+    Set SMTP_Config = CDO_Config.Fields
+    With SMTP_Config
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpusessl") = 1
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendusing") = 2
+        'please put your server name below
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpserver") = "smtp.gmail.com"
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpserverport") = 587
+        .Item("http://schemas.microsoft.com/cdo/configuration/smtpauthenticate") = 1
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendtls") = True
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendusername") = "hein.kuipers.factuurbeheer@gmail.com"
+        .Item("http://schemas.microsoft.com/cdo/configuration/sendpassword") = "FACTb1jz0nder"
+        .Update
+    End With
+    With CDO_Mail_Object
+        Set .Configuration = CDO_Config
+    End With
+    CDO_Mail_Object.Subject = Email_Subject
+    CDO_Mail_Object.From = Email_Send_From
+    CDO_Mail_Object.To = Email_Send_To
+    CDO_Mail_Object.HTMLBody = Email_Body
+    CDO_Mail_Object.CC = Email_Cc 'Use if needed
+    CDO_Mail_Object.BCC = Email_Bcc 'Use if needed
+    CDO_Mail_Object.AddAttachment pdflist(pdfcounter, 2) 'Use if needed
+    CDO_Mail_Object.Send
+    pdfcounter = pdfcounter + 1
+Wend
+debugs:
+    If Err.Description <> "" Then MsgBox Err.Description
+End Function
+Function mailpdfoutlook(pdflist, mailcount)
+pdfcounter = 0
+While pdfcounter < mailcount
+    'Create the mail
+    Set OutApp = CreateObject("Outlook.Application")
+    Set OutMail = OutApp.CreateItem(0)
+    strbody = "Beste " & voornaam(pdflist(pdfcounter, 3)) & vbNewLine & vbNewLine & _
+              "Bijgevoegd de factuur met betrekking tot de consulten van afgelopen maand." & vbNewLine & vbNewLine & _
+              "met vriendelijke groet," & vbNewLine & vbNewLine & _
+              "Hein" & vbNewLine
+    On Error Resume Next
+    ontvanger = "hein.j.kuipers@gmail.com" 'pdflist(pdfcounter, 1)
+    With OutMail
+        .To = ontvanger
+        .CC = "marcelsmeets@programmer.net"
+        .BCC = ""
+        .Subject = "Factuur " + pdflist(pdfcounter, 0)
+        .Body = strbody
+        .Attachments.Add pdflist(pdfcounter, 2)
+        .Send   'or use .Display
+    End With
+    On Error GoTo 0
+    pdfcounter = pdfcounter + 1
+Wend
+a = MsgBox("Er zijn in totaal " + Trim(Str(mailcount)) + " facturen in pdf formaat gemaild aan clienten.", vbOKOnly, "Mailen voltooid.")
+mailpdf = True
+End Function
+Function voornaam(naam)
+voornaam = Left(naam, InStr(naam, " "))
+End Function
+Function getmaand(mnd)
+If mnd = 1 Then
+    getmaand = "januari"
+ElseIf mnd = 2 Then
+    getmaand = "februari"
+ElseIf mnd = 3 Then
+    getmaand = "maart"
+ElseIf mnd = 4 Then
+    getmaand = "april"
+ElseIf mnd = 5 Then
+    getmaand = "mei"
+ElseIf mnd = 6 Then
+    getmaand = "juni"
+ElseIf mnd = 7 Then
+    getmaand = "juli"
+ElseIf mnd = 8 Then
+    getmaand = "augustus"
+ElseIf mnd = 9 Then
+    getmaand = "september"
+ElseIf mnd = 10 Then
+    getmaand = "oktober"
+ElseIf mnd = 11 Then
+    getmaand = "november"
+ElseIf mnd = 12 Then
+    getmaand = "december"
+End If
+End Function
+Function getNawData(namen)
+Dim adreslijst(30000, 30) As String
+ActiveWorkbook.Worksheets(3).Activate
+teller = 0
+For Each naam In namen
+    rij = 7
+    While Cells(rij, 1).Value <> "" And Not IsEmpty(Cells(rij, 1).Value)
+        If Trim(Cells(rij, 1).Value) = Trim(naam) Then
+            x = 1
+            While x < 31
+                adreslijst(teller, x - 1) = Cells(rij, x).Value
+                x = x + 1
+            Wend
+            teller = teller + 1
+        End If
+        rij = rij + 1
+    Wend
+Next naam
+getNawData = adreslijst
+End Function
+Function getAdres(naam, list)
+Dim adres(30) As String
+x = 0
+While list(x, 0) <> ""
+    If Trim(list(x, 0)) = Trim(naam) Then
+        j = 1
+        While j < 31
+            adres(j) = list(x, j)
+            j = j + 1
+        Wend
+    End If
+    x = x + 1
+Wend
+getAdres = adres
+End Function
+Function getTarieven()
+Dim tarieven(9999, 4) As String
+rowcounter = 5
+lstcounter = 0
+While Len(Trim(Cells(rowcounter, 1).Value)) > 0
+    tarieven(lstcounter, 0) = Cells(rowcounter, 1).Value
+    tarieven(lstcounter, 1) = Cells(rowcounter, 2).Value
+    tarieven(lstcounter, 3) = Cells(rowcounter, 3).Value
+    tarieven(lstcounter, 4) = Cells(rowcounter, 4).Value
+    lstcounter = lstcounter + 1
+    rowcounter = rowcounter + 1
+Wend
+getTarieven = tarieven
+End Function
+Function getTariefNaam(tarief, lst)
+counter = 0
+retval = ""
+While counter < 9999
+    If Len(Trim(lst(counter, 0))) > 0 Then
+        If Trim(tarief) = Trim(lst(counter, 0)) Then
+            retval = Trim(lst(counter, 4))
+            counter = 9999
+        End If
+    End If
+    counter = counter + 1
+Wend
+getTariefNaam = retval
+End Function
+
+

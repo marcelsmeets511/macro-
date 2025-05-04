@@ -1,0 +1,171 @@
+Dim namecounter As Integer
+Sub overzichtaanmaken()
+Dim namerange As Range, cell As Range
+Dim overzichtrecord(30000, 11) As String
+Dim rij As Integer, beginrij As Integer, eindrij As Integer, reccounter As Integer, somcounter As Integer
+Dim sommenlijst(9999) As Integer
+reccounter = 0
+somcounter = 0
+rij = 5
+beginrij = 0
+eindrij = 0
+ActiveWorkbook.Worksheets(1).Activate
+Set namerange = Range("J5:J999")
+unamelist = createUniqNameList(namerange)
+For Each uname In unamelist
+    If Trim(uname) <> "" Then
+        rij = 5
+        beginrij = reccounter + 6
+        While rij < 1000
+            If IsEmpty(Cells(rij, 10).Value) = True Then
+                rij = 1000
+            Else
+                If Trim(uname) = Trim(Cells(rij, 10).Value) Then
+                    For col = 1 To 6
+                        If col = 1 Then
+                            dag = Trim(Str(Day(Cells(rij, col).Value)))
+                            If Day(Cells(rij, col).Value) < 10 Then
+                                dag = "0" + dag
+                            End If
+                            maand = Trim(Str(Month(Cells(rij, col).Value)))
+                            If Month(Cells(rij, col).Value) < 10 Then
+                                maand = "0" + maand
+                            End If
+                            overzichtrecord(reccounter, col - 1) = dag + "-" + maand + "-" + Trim(Str(Year(Cells(rij, col).Value)))
+                        Else
+                            If col < 4 Then
+                                overzichtrecord(reccounter, col - 1) = Cells(rij, col).Text
+                            Else
+                                overzichtrecord(reccounter, col - 1) = Cells(rij, col).Value
+                            End If
+                        End If
+                    Next col
+                    overzichtrecord(reccounter, 6) = "=IF(ISNA(VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$B$999,2,FALSE)),0,I" + Trim(Str(reccounter + 6)) + "/(100+VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$C$999,3,FALSE))*100)"
+                    overzichtrecord(reccounter, 7) = "=IF(ISNA(VLOOPUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$B$999,2,FALSE)),0,I" + Trim(Str(reccounter + 6)) + "/(100+VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$C$999,3,FALSE))*VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$C$999,3,FALSE))"
+                    overzichtrecord(reccounter, 8) = "=IF(ISNA(VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$B$999,2,FALSE)),0,VLOOKUP(F" + Trim(Str(reccounter + 6)) + ",tarieven!$A$5:$B$999,2,FALSE))"
+                    overzichtrecord(reccounter, 9) = Cells(rij, 10).Value
+                    overzichtrecord(reccounter, 10) = Cells(rij, 11).Value
+                    reccounter = reccounter + 1
+                End If
+            End If
+            rij = rij + 1
+        Wend
+    Else
+        Exit For
+    End If
+    eindrij = reccounter + 6
+    overzichtrecord(reccounter, 0) = ""
+    reccounter = reccounter + 1
+    overzichtrecord(reccounter, 6) = "=SUM(G" + Trim(Str(beginrij)) + ":G" + Trim(Str(eindrij)) + ")"
+    overzichtrecord(reccounter, 7) = "=SUM(H" + Trim(Str(beginrij)) + ":H" + Trim(Str(eindrij)) + ")"
+    overzichtrecord(reccounter, 8) = "=SUM(I" + Trim(Str(beginrij)) + ":I" + Trim(Str(eindrij)) + ")"
+    sommenlijst(somcounter) = reccounter + 6
+    somcounter = somcounter + 1
+    reccounter = reccounter + 1
+    overzichtrecord(reccounter, 0) = ""
+    reccounter = reccounter + 1
+Next uname
+reccounter = reccounter + 1
+optelling1 = "="
+optelling2 = "="
+optelling3 = "="
+For sx = 0 To somcounter
+    If sommenlijst(sx) > 0 Then
+        If sx > 0 Then
+            optelling1 = optelling1 + "+"
+            optelling2 = optelling2 + "+"
+            optelling3 = optelling3 + "+"
+        End If
+        optelling1 = optelling1 + "G" + Trim(Str(sommenlijst(sx)))
+        optelling2 = optelling2 + "H" + Trim(Str(sommenlijst(sx)))
+        optelling3 = optelling3 + "I" + Trim(Str(sommenlijst(sx)))
+    End If
+Next sx
+overzichtrecord(reccounter, 6) = optelling1
+overzichtrecord(reccounter, 7) = optelling2
+overzichtrecord(reccounter, 8) = optelling3
+ActiveWorkbook.Sheets.Add After:=Worksheets(Worksheets.Count)
+Cells(1, 1).Value = "OVERZICHT CONSULTEN PER NAAM"
+Cells(1, 10).Value = "Hein Kuipers"
+Cells(2, 10).Value = "Lijf en Leven Maastricht"
+Cells(4, 1).Value = "datum"
+Cells(4, 2).Value = "naam client"
+Cells(4, 3).Value = "tijd"
+Cells(4, 4).Value = "contant"
+Cells(4, 5).Value = "te ontvangen"
+Cells(4, 6).Value = "opmerking"
+Cells(4, 7).Value = "bedrag ex.btw"
+Cells(4, 8).Value = "BTW"
+Cells(4, 9).Value = "factuurbedrag"
+Cells(4, 10).Value = "factuurnummer"
+Cells(4, 11).Value = "datum ontvangst"
+Range("A1:A999").NumberFormat = "@"
+Range("B1:B999").NumberFormat = "@"
+Range("C1:C999").NumberFormat = "@"
+Range("A1:A999").ColumnWidth = 10.5
+Range("B1:B999").ColumnWidth = 12
+Range("A4:K4").Interior.Color = RGB(0, 0, 0)
+Range("A4:K4").Font.Color = RGB(255, 255, 255)
+For x = 0 To reccounter
+    For cx = 1 To 11
+        If Left(overzichtrecord(x, cx - 1), 1) = "=" Then
+            Cells(x + 6, cx).Formula = overzichtrecord(x, cx - 1)
+            If Left(overzichtrecord(x, cx - 1), 4) = "=sum" Or Left(overzichtrecord(x, cx - 1), 4) = "=SUM" Then
+                With Cells(x + 6, cx).Borders(xlEdgeTop)
+                    .LineStyle = xlContinuous
+                    .Weight = xlThin
+                    .Color = RGB(0, 0, 0)
+                End With
+            End If
+            Cells(x + 6, cx).NumberFormat = "_ € * #.##0,00_ ;_ € * -#.##0,00_ ;_ € * ' - '??_ ;_ @_ "
+        Else
+            Cells(x + 6, cx).Value = overzichtrecord(x, cx - 1)
+        End If
+    Next cx
+Next x
+End Sub
+Function createNameList(rng)
+Dim cell As Range
+Dim namelist(30000) As String
+namecounter = 0
+For Each cell In rng
+    If Trim(cell.Value) <> "" Then
+        namelist(namecounter) = Trim(cell.Value)
+        namecounter = namecounter + 1
+    Else
+         Exit For
+    End If
+Next cell
+createNameList = namelist
+End Function
+
+Function createUniqNameList(rng)
+Dim cell As Range
+Dim namelist(30000) As String
+namecounter = 0
+For Each cell In rng
+    If Trim(cell.Value) <> "" Then
+        If notInNameList(Trim(cell.Value), namelist) Then
+            namelist(namecounter) = Trim(cell.Value)
+            namecounter = namecounter + 1
+         End If
+    Else
+         Exit For
+    End If
+Next cell
+createUniqNameList = namelist
+End Function
+Function notInNameList(name, list)
+foundname = True
+For Each Item In list
+    If Trim(Item) <> "" Then
+        If Trim(name) = Trim(Item) Then
+            foundname = False
+            Exit For
+        End If
+    Else
+        Exit For
+    End If
+Next Item
+notInNameList = foundname
+End Function
